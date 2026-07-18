@@ -1,0 +1,592 @@
+{
+  "name": "AI Portfolio Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "initialMessages": "Hi there! 👋\nI'm your AI Portfolio Assistant. Ask me about my work, or let me help you book a meeting.",
+        "options": {
+          "allowFileUploads": false,
+          "inputPlaceholder": "Type your question..",
+          "showWelcomeScreen": true,
+          "getStarted": "New Conversation",
+          "subtitle": "Ask about my work or book a meeting — available 24/7.",
+          "title": "AI Portfolio Assistant",
+          "responseMode": "lastNode"
+        }
+      },
+      "id": "f0a906c1-8a95-4671-85c0-bc6ee6826888",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        96
+      ],
+      "webhookId": ""
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_DATA_TABLE_ID"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $json.sessionId }}"
+            },
+            {
+              "keyName": "message_time",
+              "condition": "gte",
+              "keyValue": "={{ $now.minus(1, 'hour').toISO() }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "id": "0886bb73-3b07-4a35-a59a-79af424d77db",
+      "name": "Count Recent Messages",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        96
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().filter(i => i.json && Object.keys(i.json).length > 0 && i.json.session_id);\nconst count = rows.length;\nconst trigger = $('When chat message received').item.json;\nreturn [{ json: {\n  over_limit: count >= 30,\n  message_count: count,\n  sessionId: trigger.sessionId,\n  chatInput: trigger.chatInput\n} }];"
+      },
+      "id": "4848f448-c417-43b4-b5dd-b5abb514fb5b",
+      "name": "Rate Limit Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "over",
+              "leftValue": "={{ $json.over_limit }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "97dfa48a-8291-4376-964a-b0239147779e",
+      "name": "Over Chat Limit?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "output",
+              "name": "output",
+              "value": "You've reached the chat limit. Please try again in about an hour.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0e7c493f-67b1-4722-a496-d9c19ade98c2",
+      "name": "Rate Limit Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        896,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_DATA_TABLE_ID"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "session_id": "={{ $('When chat message received').item.json.sessionId }}",
+            "message_time": "={{ $now }}"
+          },
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message_time",
+              "displayName": "message_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0e9ef5c2-53a4-40a4-9718-9257c8c18a7e",
+      "name": "Log Chat Message",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('When chat message received').item.json.chatInput }}",
+        "options": {
+          "systemMessage": "You are a helpful AI Portfolio Assistant.\n\nYour purpose is to help visitors learn about the portfolio owner and their work, and to help them book meetings.\n\n## Rules\n- Be professional, warm, and concise.\n- NEVER invent information. Use the tools to get facts.\n- If a tool has no answer, say you don't know and offer to connect the visitor.\n- Always prefer calling a tool over guessing.\n\n## Answering questions\n- For questions about the portfolio owner, skills, experience, or contact info -> call get_profile.\n- For questions about projects or portfolio -> call get_projects.\n- For questions about services or how they can help -> call get_services.\n\n## Booking meetings\n- Before any date/time reasoning, call get_current_date to resolve relative dates like \"tomorrow\" or \"next Monday\".\n- Collect all required details first: visitor's name, email, and the desired date and time. If any are missing, ASK for them before proceeding.\n- ALWAYS call check_availability for the requested slot BEFORE booking.\n- If the slot is not available, tell the visitor and suggest they pick another time.\n- Only call book_meeting after check_availability confirms the slot is free and you have name, email, date and time. Pass client_name, client_email, meeting_date (YYYY-MM-DD), meeting_time, start_time and end_time (ISO 8601) and duration.\n- The book_meeting tool enforces validation and a one-booking-per-email-per-day limit and returns { success, message }. ALWAYS relay its message to the visitor. NEVER claim a meeting was created unless book_meeting returns success: true. If it returns success: false, share its message and offer to try another time/day.\n\n## Contact\n- Help visitors reach the portfolio owner by sharing the contact details from get_profile."
+        }
+      },
+      "id": "a66e2a15-5cef-4b9a-b4f8-a2031fabc2c8",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1504,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {}
+      },
+      "id": "63a18929-a6d2-4cdd-9458-50cf07345279",
+      "name": "Groq Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        416
+      ],
+      "credentials": {
+        "groqApi": {
+          "id": "",
+          "name": "Groq API account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('When chat message received').item.json.sessionId }}",
+        "contextWindowLength": 15
+      },
+      "id": "f8d5bf79-5c1b-4adb-9250-6a960a5be600",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        1248,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Returns the portfolio owner's profile: bio, background, skills, and contact info. Call this for any question about who they are, their skills, experience, or how to contact them. Takes no input.",
+        "jsCode": "const profile = {\n  name: \"Your Name\",\n  title: \"Your Title\",\n  bio: \"A short bio about yourself.\",\n  location: \"Remote / Available worldwide\",\n  skills: [\n    \"Skill 1\",\n    \"Skill 2\",\n    \"Skill 3\"\n  ],\n  experience: [\n    \"Your experience bullet 1\",\n    \"Your experience bullet 2\"\n  ],\n  contact: {\n    email: \"you@example.com\",\n    website: \"https://yourwebsite.com\",\n    linkedin: \"https://linkedin.com/in/yourprofile\"\n  }\n};\nreturn JSON.stringify(profile);",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {},\n  \"required\": []\n}"
+      },
+      "id": "8f5b1556-eee9-4a37-97fa-dd5e28e3865a",
+      "name": "get_profile",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        1376,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Returns a list of portfolio projects with descriptions and technologies. Call this when a visitor asks about projects, portfolio, or past work. Takes no input.",
+        "jsCode": "const projects = [\n  {\n    name: \"Project 1\",\n    description: \"Description of your project.\",\n    technologies: [\"Tech1\", \"Tech2\"]\n  },\n  {\n    name: \"Project 2\",\n    description: \"Description of another project.\",\n    technologies: [\"Tech1\", \"Tech3\"]\n  }\n];\nreturn JSON.stringify(projects);",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {},\n  \"required\": []\n}"
+      },
+      "id": "83049fde-e3b3-4ee0-be94-4bd6ff9cda38",
+      "name": "get_projects",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        1504,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Returns the services offered, with descriptions. Call this when a visitor asks what services are available, how they can help, or pricing/engagement info. Takes no input.",
+        "jsCode": "const services = [\n  {\n    name: \"Service 1\",\n    description: \"Description of your service.\"\n  },\n  {\n    name: \"Service 2\",\n    description: \"Description of another service.\"\n  }\n];\nreturn JSON.stringify(services);",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {},\n  \"required\": []\n}"
+      },
+      "id": "dbc337f0-6a52-45f1-9966-d14bd72e9e5b",
+      "name": "get_services",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        1632,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Returns the current date and time in ISO format. ALWAYS call this before checking availability or creating a meeting so relative dates like \"tomorrow\" or \"next Monday\" are resolved correctly. Takes no input.",
+        "jsCode": "const now = new Date();\nreturn JSON.stringify({\n  iso: now.toISOString(),\n  readable: now.toString(),\n  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone\n});",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {},\n  \"required\": []\n}"
+      },
+      "id": "03c8b5b0-3690-440f-9ea8-23ed07f37ccf",
+      "name": "get_current_date",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        1760,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Check whether a time slot is free in your Google Calendar before booking. Provide start and end times in ISO 8601 format. Returns whether the slot is available.",
+        "resource": "calendar",
+        "calendar": {
+          "__rl": true,
+          "value": "your-email@gmail.com",
+          "mode": "id"
+        },
+        "timeMin": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('start_time', 'Start of the interval to check, in ISO 8601 format') }}",
+        "timeMax": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('end_time', 'End of the interval to check, in ISO 8601 format') }}",
+        "options": {
+          "outputFormat": "availability"
+        }
+      },
+      "id": "1d6261f7-49da-4701-a929-88ecfe477fdd",
+      "name": "check_availability",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        1888,
+        416
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "",
+          "name": "Google Calendar OAuth2 account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Book a meeting in your Google Calendar. Call this ONLY after you have the visitor's name, email, desired date and time, AND check_availability has confirmed the slot is free. Provide start_time and end_time in ISO 8601 format, plus meeting_date (YYYY-MM-DD), meeting_time (e.g. \"15:00\"), and duration (e.g. \"30 minutes\"). The tool validates the request, enforces one booking per email per day, creates the event and returns { success, message, event_id, event_link }. Relay the returned message to the visitor and NEVER claim the meeting was booked unless success is true.",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "",
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "client_name": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('client_name', \"The visitor's full name\") }}",
+            "client_email": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('client_email', \"The visitor's email address\") }}",
+            "meeting_date": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('meeting_date', 'The meeting date in YYYY-MM-DD format') }}",
+            "meeting_time": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('meeting_time', 'The meeting start time, e.g. \"15:00\"') }}",
+            "start_time": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('start_time', 'Meeting start datetime in ISO 8601 format') }}",
+            "end_time": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('end_time', 'Meeting end datetime in ISO 8601 format') }}",
+            "duration": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('duration', 'Meeting duration, e.g. \"30 minutes\"') }}"
+          },
+          "schema": [
+            {
+              "id": "client_name",
+              "displayName": "client_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "client_email",
+              "displayName": "client_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "meeting_date",
+              "displayName": "meeting_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "meeting_time",
+              "displayName": "meeting_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "start_time",
+              "displayName": "start_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "end_time",
+              "displayName": "end_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "duration",
+              "displayName": "duration",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "4168168b-15bd-42e3-95ef-31f672bd29e1",
+      "name": "book_meeting",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        2016,
+        416
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Count Recent Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count Recent Messages": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Gate": {
+      "main": [
+        [
+          {
+            "node": "Over Chat Limit?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Over Chat Limit?": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Chat Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Chat Message": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_profile": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_projects": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_services": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_current_date": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_availability": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "book_meeting": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "nodeGroups": [],
+  "id": "2hQrUqtUkjLf1Gok",
+  "tags": []
+}
