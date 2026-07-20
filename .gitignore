@@ -22,3 +22,9 @@ prisma/migrations/
 .vscode/
 .idea/
 api/portfolio.db
+
+# Streamlit secrets
+streamlit/.streamlit/secrets.toml
+
+# Presentations
+presentation.html

@@ -30,6 +30,10 @@ class Widget(Base):
     dailyMessageLimit = Column(Integer, default=1000)
     isActive = Column(Boolean, default=True)
     userId = Column(String, default="default")
+    google_calendar_email = Column(String, nullable=True)
+    google_access_token = Column(Text, nullable=True)
+    google_refresh_token = Column(Text, nullable=True)
+    google_token_expires_at = Column(DateTime, nullable=True)
     createdAt = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updatedAt = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

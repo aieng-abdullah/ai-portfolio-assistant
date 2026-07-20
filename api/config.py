@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     api_host: str = os.getenv("API_HOST", "0.0.0.0")
     api_port: int = int(os.getenv("API_PORT", "3000"))
     environment: str = os.getenv("ENVIRONMENT", "development")
+    google_oauth_client_id: str = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
+    google_oauth_client_secret: str = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
 
     class Config:
         env_file = ".env"
