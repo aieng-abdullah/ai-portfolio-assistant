@@ -91,7 +91,7 @@ async def chat(slug: str, request: ChatRequest, db: Session = Depends(get_db)):
 
     await _log_message(db, widget, request.sessionId, "user", request.message)
 
-    response = await proxy_to_n8n(slug, request.sessionId, request.message)
+    response = await proxy_to_n8n(slug, request.sessionId, request.message, db)
 
     await _log_message(db, widget, request.sessionId, "assistant", response)
 
