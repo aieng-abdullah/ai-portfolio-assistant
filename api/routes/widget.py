@@ -1,12 +1,14 @@
-from fastapi import APIRouter, HTTPException
-from database import prisma
+import json
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.orm import Session
+from database import get_db, Widget
 from models import WidgetConfigResponse, ProfileResponse
 
 router = APIRouter()
 
 
-async def _get_widget_or_404(slug: str):
-    widget = await prisma.widget.find_unique(where={"slug": slug})
+def _get_widget_or_404(db: Session, slug: str) -> Widget:
+    widget = db.query(Widget).filter(Widget.slug == slug).first()
     if not widget:
         raise HTTPException(status_code=404, detail=f"Widget '{slug}' not found")
     if not widget.isActive:
@@ -14,20 +16,31 @@ async def _get_widget_or_404(slug: str):
     return widget
 
 
+def _parse_json(value, default=None):
+    if default is None:
+        default = {}
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return default
+    return value if value else default
+
+
 @router.get("/api/widget/{slug}/config", response_model=WidgetConfigResponse)
-async def get_widget_config(slug: str):
-    widget = await _get_widget_or_404(slug)
+async def get_widget_config(slug: str, db: Session = Depends(get_db)):
+    widget = _get_widget_or_404(db, slug)
     return WidgetConfigResponse(
         name=widget.name,
-        theme=widget.theme if isinstance(widget.theme, dict) else {},
-        personality=widget.personality if isinstance(widget.personality, dict) else {},
+        theme=_parse_json(widget.theme, {}),
+        personality=_parse_json(widget.personality, {}),
     )
 
 
 @router.get("/api/widget/{slug}/profile", response_model=ProfileResponse)
-async def get_widget_profile(slug: str):
-    widget = await _get_widget_or_404(slug)
-    profile = widget.profile if isinstance(widget.profile, dict) else {}
+async def get_widget_profile(slug: str, db: Session = Depends(get_db)):
+    widget = _get_widget_or_404(db, slug)
+    profile = _parse_json(widget.profile, {})
     return ProfileResponse(
         name=profile.get("name"),
         title=profile.get("title"),
@@ -40,18 +53,18 @@ async def get_widget_profile(slug: str):
 
 
 @router.get("/api/widget/{slug}/projects")
-async def get_widget_projects(slug: str):
-    widget = await _get_widget_or_404(slug)
-    return widget.projects if isinstance(widget.projects, list) else []
+async def get_widget_projects(slug: str, db: Session = Depends(get_db)):
+    widget = _get_widget_or_404(db, slug)
+    return _parse_json(widget.projects, [])
 
 
 @router.get("/api/widget/{slug}/services")
-async def get_widget_services(slug: str):
-    widget = await _get_widget_or_404(slug)
-    return widget.services if isinstance(widget.services, list) else []
+async def get_widget_services(slug: str, db: Session = Depends(get_db)):
+    widget = _get_widget_or_404(db, slug)
+    return _parse_json(widget.services, [])
 
 
 @router.get("/api/widget/{slug}/faq")
-async def get_widget_faq(slug: str):
-    widget = await _get_widget_or_404(slug)
-    return widget.faq if isinstance(widget.faq, list) else []
+async def get_widget_faq(slug: str, db: Session = Depends(get_db)):
+    widget = _get_widget_or_404(db, slug)
+    return _parse_json(widget.faq, [])

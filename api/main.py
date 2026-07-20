@@ -1,12 +1,13 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from sqlalchemy.orm import Session
 
 from config import get_settings
-from database import connect_db, disconnect_db
+from database import init_db, get_db
 from models import HealthResponse
 from routes.widget import router as widget_router
 from routes.chat import router as chat_router
@@ -18,10 +19,8 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    settings = get_settings()
-    await connect_db()
+    init_db()
     yield
-    await disconnect_db()
 
 
 app = FastAPI(
@@ -46,10 +45,13 @@ app.include_router(abuse_router)
 
 
 @app.get("/api/health", response_model=HealthResponse)
-async def health_check():
-    from database import prisma
-
-    db_status = "connected" if prisma.is_connected() else "disconnected"
+async def health_check(db: Session = Depends(get_db)):
+    try:
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
+        db_status = "connected"
+    except Exception:
+        db_status = "disconnected"
 
     return HealthResponse(
         status="healthy" if db_status == "connected" else "degraded",

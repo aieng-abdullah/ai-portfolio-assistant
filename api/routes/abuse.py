@@ -14,8 +14,5 @@ async def log_abuse(slug: str, request: AbuseLogRequest):
         "sessionId": request.sessionId,
         "filtered": request.filtered,
     }
-
-    # Log to stdout for now (can be extended to file/Sentry/etc.)
     print(f"[ABUSE] {json.dumps(log_entry)}")
-
     return {"status": "logged"}

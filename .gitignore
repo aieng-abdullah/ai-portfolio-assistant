@@ -21,3 +21,4 @@ prisma/migrations/
 # IDE
 .vscode/
 .idea/
+api/portfolio.db

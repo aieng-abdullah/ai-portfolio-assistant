@@ -6,7 +6,7 @@ from functools import lru_cache
 class Settings(BaseSettings):
     database_url: str = os.getenv(
         "DATABASE_URL",
-        "postgresql://portfolio:portfolio_dev@localhost:5432/portfolio"
+        "sqlite:///./portfolio.db"
     )
     n8n_webhook_url: str = os.getenv(
         "N8N_WEBHOOK_URL",
