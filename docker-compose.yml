@@ -44,6 +44,21 @@ services:
       postgres:
         condition: service_healthy
 
+  api:
+    build: ./api
+    container_name: ai-portfolio-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-3000}:3000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-portfolio}:${POSTGRES_PASSWORD:-portfolio_dev}@postgres:5432/${POSTGRES_DB:-portfolio}
+      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://n8n:5678/webhook/}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   n8n_data:
   postgres_data:
