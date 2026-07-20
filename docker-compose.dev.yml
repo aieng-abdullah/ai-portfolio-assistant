@@ -1,0 +1,72 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-portfolio-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: portfolio
+      POSTGRES_USER: portfolio
+      POSTGRES_PASSWORD: portfolio_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portfolio"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: ai-portfolio-n8n-dev
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+      - N8N_SECURE_COOKIE=false
+      - GENERIC_TIMEZONE=UTC
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=portfolio
+      - DB_POSTGRESDB_USER=portfolio
+      - DB_POSTGRESDB_PASSWORD=portfolio_dev
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: ai-portfolio-api-dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://portfolio:portfolio_dev@postgres:5432/portfolio
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - ENVIRONMENT=development
+      - API_HOST=0.0.0.0
+      - API_PORT=3000
+    volumes:
+      - ./api:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      n8n:
+        condition: service_healthy
+
+volumes:
+  n8n_data:
+  postgres_data:
