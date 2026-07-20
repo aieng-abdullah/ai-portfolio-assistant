@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Widget {
+  id                String         @id @default(cuid())
+  slug              String         @unique
+  name              String?
+  profile           Json           @default("{}")
+  projects          Json           @default("[]")
+  services          Json           @default("[]")
+  faq               Json           @default("[]")
+  personality       Json           @default("{}")
+  theme             Json           @default("{}")
+  rateLimit         Int            @default(30)
+  dailyMessageLimit Int            @default(1000)
+  isActive          Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  userId            String
+  chatLogs          ChatLog[]
+  chatSessions      ChatSession[]
+}
+
+model ChatSession {
+  id            String      @id @default(cuid())
+  sessionId     String
+  widgetId      String
+  messageCount  Int         @default(0)
+  lastMessageAt DateTime    @default(now())
+  createdAt     DateTime    @default(now())
+  widget        Widget      @relation(fields: [widgetId], references: [id])
+  chatLogs      ChatLog[]
+
+  @@unique([sessionId, widgetId])
+  @@index([widgetId])
+  @@index([sessionId])
+}
+
+model ChatLog {
+  id        String      @id @default(cuid())
+  widgetId  String
+  sessionId String
+  role      String
+  message   String
+  createdAt DateTime    @default(now())
+  widget    Widget      @relation(fields: [widgetId], references: [id])
+  session   ChatSession? @relation(fields: [sessionId, widgetId], references: [sessionId, widgetId])
+
+  @@index([widgetId])
+  @@index([sessionId])
+  @@index([createdAt])
+}
