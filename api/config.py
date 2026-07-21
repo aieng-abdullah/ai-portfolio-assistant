@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     )
     google_oauth_client_id: str = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
     google_oauth_client_secret: str = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
+    groq_api_key: str = os.getenv("GROQ_API_KEY", "")
 
     class Config:
         env_file = ".env"
