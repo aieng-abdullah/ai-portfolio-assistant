@@ -1,6 +1,5 @@
 import streamlit as st
 import requests
-import json
 
 API_BASE = "http://localhost:3000"
 

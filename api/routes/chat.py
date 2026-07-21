@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
@@ -7,17 +6,6 @@ from services.chat_proxy import proxy_to_n8n
 from database import get_db, Widget, ChatSession, ChatLog
 
 router = APIRouter()
-
-
-def _parse_json(value, default=None):
-    if default is None:
-        default = {}
-    if isinstance(value, str):
-        try:
-            return json.loads(value)
-        except (json.JSONDecodeError, TypeError):
-            return default
-    return value if value else default
 
 
 async def _check_rate_limit(db: Session, widget: Widget, session_id: str) -> dict:

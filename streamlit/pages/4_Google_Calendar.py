@@ -80,7 +80,6 @@ if "google_calendar_token" not in st.session_state:
             email = "unknown"
 
         # Calculate expiry
-        expires_in = token.get("expires_in", 3600)
         expires_at = datetime.now(timezone.utc).isoformat()
 
         # Save to backend

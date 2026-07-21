@@ -1,30 +1,30 @@
 # AI Portfolio Assistant
 
-A SaaS platform that lets users add an AI-powered chat widget to their website. Visitors can ask questions about the portfolio owner, view projects/services, and book meetings.
+A SaaS platform that provides a **REST API** for AI-powered chat. Clients call the API from their own frontend to let visitors ask questions about the portfolio owner, view projects/services, and book meetings.
 
 ## What It Does
 
-- **Embeddable chat widget** — one line of code to add to any website
+- **REST API** — clients fetch portfolio data and send chat messages from their own UI
 - **Multi-tenant** — each user gets their own widget with custom data
 - **Customizable** — colors, logo, personality, system prompt
 - **Guardrails** — input validation, output filtering, rate limiting
-- **Production-ready** — health checks, kill switch, abuse logging
+- **Production-ready** — PostgreSQL, health checks, kill switch, abuse logging
 
 ## Architecture
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│                  USER'S WEBSITE                       │
-│   <script src="widget.js" data-widget-id="abc123">   │
+│                  CLIENT'S FRONTEND                    │
+│   Calls REST API from their own UI                   │
 └──────────────┬───────────────────────────────────────┘
-               │ loads iframe
+               │ HTTP requests
                ▼
 ┌──────────────────────────────────────────────────────┐
 │              FastAPI Backend                          │
-│  /widget/{slug}  — Chat UI (iframe)                  │
-│  /widget.js      — Loader script                     │
-│  /api/chat/{slug} — Chat proxy → n8n                 │
-│  /api/widget/*   — Config, profile, projects         │
+│  GET  /api/widget/{slug}/config  — Theme settings    │
+│  GET  /api/widget/{slug}/profile — Portfolio data    │
+│  POST /api/chat/{slug}           — Chat proxy → n8n  │
+│  POST /api/admin/widget/{slug}/* — Admin controls    │
 └──────────────┬───────────────────────────────────────┘
                │
                ▼
@@ -69,6 +69,7 @@ docker compose up -d
 
 Services running:
 - **API**: http://localhost:3000
+- **API Docs**: http://localhost:3000/docs
 - **n8n**: http://localhost:5678
 - **PostgreSQL**: localhost:5432
 
@@ -83,7 +84,6 @@ Services running:
 ### 5. Create a widget
 
 ```bash
-# Create a widget via API
 curl -X POST http://localhost:3000/api/widget \
   -H "Content-Type: application/json" \
   -d '{
@@ -99,10 +99,18 @@ curl -X POST http://localhost:3000/api/widget \
   }'
 ```
 
-### 6. Embed on your website
+### 6. Use the API
 
-```html
-<script src="http://localhost:3000/widget.js" data-widget-id="my-portfolio" async></script>
+```javascript
+// Fetch config for theming
+const config = await fetch('http://localhost:3000/api/widget/my-portfolio/config').then(r => r.json());
+
+// Send chat message
+const response = await fetch('http://localhost:3000/api/chat/my-portfolio', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ sessionId: 'user-123', message: 'Hello!' })
+}).then(r => r.json());
 ```
 
 ## Project Structure
@@ -112,7 +120,7 @@ ai-portfolio-assistant/
 ├── api/                        # FastAPI backend
 │   ├── main.py                 # App entry point
 │   ├── config.py               # Environment config
-│   ├── database.py             # Prisma connection
+│   ├── database.py             # SQLAlchemy + PostgreSQL
 │   ├── models.py               # Pydantic models
 │   ├── routes/
 │   │   ├── widget.py           # Widget data endpoints
@@ -121,13 +129,8 @@ ai-portfolio-assistant/
 │   │   └── abuse.py            # Abuse logging
 │   ├── services/
 │   │   └── chat_proxy.py       # n8n proxy + rate limiter
-│   ├── static/
-│   │   ├── widget.js           # Loader script
-│   │   └── widget.html         # Chat UI template
 │   ├── Dockerfile
 │   └── requirements.txt
-├── prisma/
-│   └── schema.prisma           # Database schema
 ├── n8n/
 │   └── workflows/
 │       └── AI Portfolio Assistant v2.json
@@ -135,7 +138,7 @@ ai-portfolio-assistant/
 │   ├── app.py
 │   └── pages/
 ├── docs/
-│   ├── integration.md          # User integration guide
+│   ├── integration.md          # API integration guide
 │   ├── api.md                  # API documentation
 │   └── changelog.md            # Per-chunk changelog
 ├── docker-compose.yml          # Production stack
@@ -145,11 +148,7 @@ ai-portfolio-assistant/
 
 ## API Documentation
 
-See [docs/api.md](docs/api.md) or visit http://localhost:3000/docs (auto-generated).
-
-## Integration Guide
-
-See [docs/integration.md](docs/integration.md) for platform-specific instructions.
+See [docs/integration.md](docs/integration.md) for integration examples, or visit http://localhost:3000/docs (auto-generated Swagger UI).
 
 ## Guardrails
 
@@ -168,6 +167,11 @@ The n8n workflow includes 7 layers of protection:
 ```bash
 # Start in development mode
 docker compose -f docker-compose.dev.yml up -d
+
+# Run tests
+cd api
+pip install -r requirements.txt
+pytest tests/ -v
 
 # Run Streamlit prototype
 cd streamlit

@@ -1,135 +1,251 @@
 # Integration Guide
 
-## Quick Start (30 seconds)
+The AI Portfolio Assistant exposes a **REST API**. Clients call the API from their own frontend to fetch portfolio data and send chat messages.
 
-1. Sign up at your domain
-2. Fill in your profile + customize your widget
-3. Copy your embed code
-4. Paste it before `</body>` on your website
-5. Done! A chat bubble appears on your site.
+## Base URL
 
-## Your Embed Code
-
-```html
-<script
-  src="https://app.yourdomain.com/widget.js"
-  data-widget-id="YOUR_WIDGET_ID"
-  async
-></script>
+```
+https://your-api-domain.com
 ```
 
-## Platform-Specific Instructions
+CORS is enabled for all origins (`*`), so any website can call the API.
 
-### HTML / Static Sites
-Paste the embed code before `</body>` in your HTML file.
+---
+
+## Available Endpoints
+
+### Widget Data
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/widget/{slug}/config` | Theme + personality settings |
+| GET | `/api/widget/{slug}/profile` | Name, title, bio, skills, contact |
+| GET | `/api/widget/{slug}/projects` | Projects array |
+| GET | `/api/widget/{slug}/services` | Services array |
+| GET | `/api/widget/{slug}/faq` | FAQ array |
+
+### Chat
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/api/chat/{slug}` | Send message, get AI response |
+
+### Admin
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/api/widget/{slug}/create` | Create a new widget |
+| POST | `/api/admin/widget/{slug}/disable` | Disable widget (kill switch) |
+| POST | `/api/admin/widget/{slug}/enable` | Re-enable widget |
+| GET | `/api/admin/widget/{slug}/stats` | Chat statistics |
+
+### Health
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/health` | API + database status |
+
+---
+
+## How to Use
+
+### 1. Fetch Widget Config (for theming)
+
+```javascript
+const response = await fetch('https://api.example.com/api/widget/my-portfolio/config');
+const config = await response.json();
+
+// config = {
+//   name: "My Portfolio",
+//   theme: { primaryColor: "#4F46E5", chatTitle: "Chat with me!" },
+//   personality: { tone: "witty_professional" }
+// }
+```
+
+### 2. Send Chat Message
+
+```javascript
+const response = await fetch('https://api.example.com/api/chat/my-portfolio', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    sessionId: 'user-123',
+    message: 'What projects do you have?'
+  })
+});
+const data = await response.json();
+
+// data = {
+//   response: "Here are some of my projects...",
+//   sessionId: "user-123"
+// }
+```
+
+### 3. Get Profile Data
+
+```javascript
+const response = await fetch('https://api.example.com/api/widget/my-portfolio/profile');
+const profile = await response.json();
+
+// profile = {
+//   name: "John Doe",
+//   title: "Developer",
+//   bio: "Building cool stuff",
+//   skills: ["React", "Node.js"],
+//   contact: { email: "john@example.com" }
+// }
+```
+
+---
+
+## Example: Vanilla HTML/JS
 
 ```html
 <!DOCTYPE html>
 <html>
-<head>...</head>
+<head>
+  <title>My Portfolio</title>
+</head>
 <body>
-  <!-- Your content -->
+  <h1>John Doe - Developer</h1>
+  <div id="chat"></div>
 
-  <script src="https://app.yourdomain.com/widget.js" data-widget-id="abc123" async></script>
+  <script>
+    const API = 'https://api.example.com';
+    const SLUG = 'my-portfolio';
+    const sessionId = 'session_' + Math.random().toString(36).substr(2, 9);
+
+    // Load profile
+    fetch(`${API}/api/widget/${SLUG}/profile`)
+      .then(r => r.json())
+      .then(profile => {
+        document.getElementById('chat').innerHTML = `
+          <h2>${profile.name}</h2>
+          <p>${profile.bio}</p>
+          <p>Skills: ${profile.skills.join(', ')}</p>
+        `;
+      });
+
+    // Send message
+    function sendMessage(text) {
+      fetch(`${API}/api/chat/${SLUG}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, message: text })
+      })
+      .then(r => r.json())
+      .then(data => console.log('AI:', data.response));
+    }
+  </script>
 </body>
 </html>
 ```
 
-### WordPress
-**Method 1: Theme Editor**
-1. Go to Appearance → Theme Editor
-2. Open `footer.php`
-3. Paste the embed code before `</body>`
-4. Save
+---
 
-**Method 2: Plugin**
-1. Install "Insert Headers and Footers" plugin
-2. Go to Settings → Insert Headers and Footers
-3. Paste in the "Scripts in Footer" section
-4. Save
+## Example: React
 
-### Webflow
-1. Go to Project Settings → Custom Code
-2. Paste in "Footer Code"
-3. Click Save & Publish
-
-### Squarespace
-1. Go to Settings → Advanced → Code Injection
-2. Paste in the "Footer" section
-3. Click Save
-
-### Wix
-1. Go to Settings → Custom Code → Add Code
-2. Select "Body (End)"
-3. Paste the embed code
-4. Click Publish
-
-### Shopify
-1. Go to Online Store → Themes → Edit Code
-2. Open `theme.liquid`
-3. Paste before `</body>`
-4. Save
-
-### Next.js / React
 ```jsx
-// In _app.js or layout.js
-useEffect(() => {
-  const script = document.createElement('script');
-  script.src = 'https://app.yourdomain.com/widget.js';
-  script.setAttribute('data-widget-id', 'abc123');
-  script.async = true;
-  document.body.appendChild(script);
-}, []);
+import { useState, useEffect } from 'react';
+
+const API = 'https://api.example.com';
+const SLUG = 'my-portfolio';
+
+function ChatWidget() {
+  const [message, setMessage] = useState('');
+  const [messages, setMessages] = useState([]);
+  const [config, setConfig] = useState(null);
+  const sessionId = useState('session_' + Math.random().toString(36).substr(2, 9))[0];
+
+  useEffect(() => {
+    fetch(`${API}/api/widget/${SLUG}/config`)
+      .then(r => r.json())
+      .then(setConfig);
+  }, []);
+
+  const sendMessage = async () => {
+    if (!message.trim()) return;
+
+    setMessages(prev => [...prev, { role: 'user', text: message }]);
+    setMessage('');
+
+    const res = await fetch(`${API}/api/chat/${SLUG}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, message })
+    });
+    const data = await res.json();
+
+    setMessages(prev => [...prev, { role: 'bot', text: data.response }]);
+  };
+
+  return (
+    <div>
+      <h2>{config?.name || 'Portfolio Assistant'}</h2>
+      <div>
+        {messages.map((m, i) => (
+          <div key={i} className={m.role}>
+            {m.text}
+          </div>
+        ))}
+      </div>
+      <input
+        value={message}
+        onChange={e => setMessage(e.target.value)}
+        onKeyDown={e => e.key === 'Enter' && sendMessage()}
+      />
+      <button onClick={sendMessage}>Send</button>
+    </div>
+  );
+}
+
+export default ChatWidget;
 ```
 
-### Vue / Nuxt
-```javascript
-// In nuxt.config.js
-export default {
-  script: [
-    { src: 'https://app.yourdomain.com/widget.js', 'data-widget-id': 'abc123', async: true }
-  ]
+---
+
+## Rate Limits
+
+| Limit | Default | Configurable |
+|-------|---------|--------------|
+| Per session | 30 messages/hour | Yes, per widget |
+| Per widget | 1000 messages/day | Yes, per widget |
+
+When rate limited, the API returns:
+```json
+{
+  "response": "You've reached the chat limit. Please try again later.",
+  "sessionId": "user-123"
 }
 ```
 
-## Widget Options
+---
 
-| Attribute | Description | Default |
-|-----------|-------------|---------|
-| `data-widget-id` | Your widget ID (required) | — |
-| `data-position` | Position on screen | `bottom-right` |
-| `data-greeting` | Custom greeting text | From dashboard |
+## Error Responses
 
-### Position Options
-- `bottom-right` (default)
-- `bottom-left`
-- `top-right`
-- `top-left`
+| Status | Meaning |
+|--------|---------|
+| 200 | Success |
+| 404 | Widget not found |
+| 403 | Widget disabled (kill switch) |
+| 429 | Rate limited |
 
-## Customization
-
-All customization is done through the dashboard:
-- Colors (primary, secondary)
-- Font family
-- Border radius
-- Logo
-- Chat title & subtitle
-- Welcome message
-- AI personality (Professional → Witty → Casual)
-- Custom system prompt (advanced)
-
-Changes apply instantly — no need to re-embed.
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| Widget not appearing | Check browser console for errors, verify script tag is correct |
-| Chat not responding | Check if widget is active in dashboard |
-| Styling conflicts | Widget runs in isolated iframe, shouldn't conflict |
-| Mobile not showing | Widget is mobile responsive by default |
-| "Chat unavailable" | Widget may be disabled — check dashboard |
+---
 
 ## Testing
 
-Test your widget at: `https://app.yourdomain.com/widget/YOUR_WIDGET_ID`
+Test the API at: `https://api.example.com/docs` (Swagger UI)
+
+Or use curl:
+```bash
+# Health check
+curl https://api.example.com/api/health
+
+# Get config
+curl https://api.example.com/api/widget/my-portfolio/config
+
+# Send message
+curl -X POST https://api.example.com/api/chat/my-portfolio \
+  -H "Content-Type: application/json" \
+  -d '{"sessionId": "test-123", "message": "Hello!"}'
+```

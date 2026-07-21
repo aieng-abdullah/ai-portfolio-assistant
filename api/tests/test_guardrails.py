@@ -1,9 +1,4 @@
-import pytest
-
-
 def test_input_guard_clean_message():
-    from unittest.mock import MagicMock
-
     mock_json = {"chatInput": "Tell me about your projects", "sessionId": "session-123"}
 
     injection_patterns = [

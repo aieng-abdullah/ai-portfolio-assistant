@@ -1,25 +1,23 @@
-import pytest
 from unittest.mock import MagicMock
 
 
-def test_health_check_connected(mock_prisma):
-    mock_prisma.is_connected = MagicMock(return_value=True)
-
+def test_health_check_connected():
     from main import health_check
     import asyncio
 
-    result = asyncio.run(health_check())
+    db = MagicMock()
+    result = asyncio.run(health_check(db=db))
     assert result.status == "healthy"
     assert result.services["database"] == "connected"
 
 
-def test_health_check_disconnected(mock_prisma):
-    mock_prisma.is_connected = MagicMock(return_value=False)
-
+def test_health_check_disconnected():
     from main import health_check
     import asyncio
 
-    result = asyncio.run(health_check())
+    db = MagicMock()
+    db.execute.side_effect = Exception("Connection failed")
+    result = asyncio.run(health_check(db=db))
     assert result.status == "degraded"
     assert result.services["database"] == "disconnected"
 
