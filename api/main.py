@@ -61,3 +61,18 @@ async def health_check(db: Session = Depends(get_db)):
 @app.get("/")
 async def root():
     return {"message": "AI Portfolio Assistant API", "docs": "/docs"}
+
+
+@app.get("/api/debug/{slug}")
+async def debug_widget(slug: str, db: Session = Depends(get_db)):
+    from database import Widget
+    import json
+    widget = db.query(Widget).filter(Widget.slug == slug).first()
+    if not widget:
+        return {"error": "not found"}
+    return {
+        "slug": widget.slug,
+        "name": widget.name,
+        "profile_raw": repr(widget.profile[:200] if widget.profile else None),
+        "profile_type": str(type(widget.profile)),
+    }

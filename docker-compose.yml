@@ -39,6 +39,8 @@ services:
       - DB_POSTGRESDB_USER=${POSTGRES_USER:-portfolio}
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-portfolio_dev}
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-}
+      - N8N_API_KEY=${N8N_API_KEY:-oJsri0Yw0YxdL6jisPc_mAT15jF5bzomaQi42i3svZE}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
     volumes:
       - n8n_data:/home/node/.n8n
     depends_on:
@@ -62,7 +64,7 @@ services:
       - "${API_PORT:-3000}:3000"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-portfolio}:${POSTGRES_PASSWORD:-portfolio_dev}@postgres:5432/${POSTGRES_DB:-portfolio}
-      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/chat
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - API_HOST=0.0.0.0

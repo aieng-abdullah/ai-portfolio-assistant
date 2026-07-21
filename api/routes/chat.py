@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from models import ChatRequest, ChatResponse, RateLimitResponse
 from services.chat_proxy import proxy_to_n8n
+from services.llm import call_llm
 from database import get_db, Widget, ChatSession, ChatLog
 
 router = APIRouter()

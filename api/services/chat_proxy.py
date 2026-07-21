@@ -99,6 +99,7 @@ async def proxy_to_n8n(slug: str, session_id: str, message: str, db: Session = N
                     "chatInput": message,
                     "sessionId": session_id,
                     "slug": slug,
+                    "groqApiKey": settings.groq_api_key,
                 },
                 headers={"Content-Type": "application/json"},
             )
