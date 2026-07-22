@@ -143,7 +143,99 @@ async def calendar_token(slug: str, db: Session = Depends(get_db)):
 
     now = datetime.now(timezone.utc)
     if widget.google_token_expires_at and widget.google_token_expires_at.replace(tzinfo=timezone.utc) > now:
-        return {"access_token": widget.google_access_token, "email": widget.google_calendar_email}
+    return {"access_token": widget.google_access_token, "email": widget.google_calendar_email}
+
+
+async def _ensure_valid_token(widget: Widget, db: Session) -> str:
+    now = datetime.now(timezone.utc)
+    if widget.google_token_expires_at and widget.google_token_expires_at.replace(tzinfo=timezone.utc) > now:
+        return widget.google_access_token
+
+    from config import get_settings
+    settings = get_settings()
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        response = await client.post(
+            GOOGLE_TOKEN_URL,
+            data={
+                "client_id": settings.google_oauth_client_id,
+                "client_secret": settings.google_oauth_client_secret,
+                "refresh_token": widget.google_refresh_token,
+                "grant_type": "refresh_token",
+            },
+        )
+        if response.status_code != 200:
+            raise HTTPException(status_code=502, detail="Failed to refresh Google token")
+        token_data = response.json()
+
+    widget.google_access_token = token_data["access_token"]
+    widget.google_token_expires_at = now + timedelta(seconds=token_data.get("expires_in", 3600))
+    db.commit()
+    return widget.google_access_token
+
+
+class CalendarBookRequest(BaseModel):
+    summary: str
+    description: str = ""
+    start_time: str
+    end_time: str
+    attendee_name: str = ""
+    attendee_email: str = ""
+    timezone: str = "UTC"
+
+
+GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3"
+
+
+@router.post("/api/widget/{slug}/calendar/book")
+async def calendar_book(slug: str, data: CalendarBookRequest, db: Session = Depends(get_db)):
+    widget = _get_widget_or_404(db, slug)
+    if not widget.google_access_token or not widget.google_refresh_token:
+        raise HTTPException(status_code=400, detail="Calendar not connected. Set up OAuth first.")
+
+    access_token = await _ensure_valid_token(widget, db)
+
+    event = {
+        "summary": data.summary,
+        "description": data.description,
+        "start": {
+            "dateTime": data.start_time,
+            "timeZone": data.timezone,
+        },
+        "end": {
+            "dateTime": data.end_time,
+            "timeZone": data.timezone,
+        },
+    }
+
+    if data.attendee_email:
+        event["attendees"] = [
+            {"email": data.attendee_email, "displayName": data.attendee_name}
+        ]
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        response = await client.post(
+            f"{GOOGLE_CALENDAR_API}/calendars/primary/events",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+            },
+            json=event,
+        )
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to create event: {response.text}",
+            )
+        result = response.json()
+
+    return {
+        "event_id": result.get("id"),
+        "html_link": result.get("htmlLink"),
+        "summary": result.get("summary"),
+        "start": result.get("start", {}).get("dateTime"),
+        "end": result.get("end", {}).get("dateTime"),
+    }
 
     from config import get_settings
     settings = get_settings()
