@@ -1,4 +1,6 @@
 import json
+import re
+import httpx
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
@@ -9,6 +11,67 @@ from services.llm import call_llm, call_llm_stream
 from services.input_guard import check_input
 from services.output_guard import check_output
 from database import get_db, Widget, ChatSession, ChatLog, AbuseLog
+
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3"
+
+
+async def _ensure_valid_token(widget, db):
+    now = datetime.now(timezone.utc)
+    if widget.google_token_expires_at and widget.google_token_expires_at.replace(tzinfo=timezone.utc) > now:
+        return widget.google_access_token
+
+    from config import get_settings
+    settings = get_settings()
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(
+            GOOGLE_TOKEN_URL,
+            data={
+                "client_id": settings.google_oauth_client_id,
+                "client_secret": settings.google_oauth_client_secret,
+                "refresh_token": widget.google_refresh_token,
+                "grant_type": "refresh_token",
+            },
+        )
+        if resp.status_code != 200:
+            return None
+        token_data = resp.json()
+
+    widget.google_access_token = token_data["access_token"]
+    widget.google_token_expires_at = now + timedelta(seconds=token_data.get("expires_in", 3600))
+    db.commit()
+    return widget.google_access_token
+
+
+async def _book_calendar_event(widget: Widget, db: Session, name: str, email: str, start_dt: str, end_dt: str, tz: str) -> dict | None:
+    if not widget.google_access_token or not widget.google_refresh_token:
+        return None
+
+    access_token = await _ensure_valid_token(widget, db)
+    if not access_token:
+        return None
+
+    event = {
+        "summary": f"Meeting with {name}",
+        "description": f"Booked via portfolio assistant\nAttendee: {name} ({email})",
+        "start": {"dateTime": start_dt, "timeZone": tz},
+        "end": {"dateTime": end_dt, "timeZone": tz},
+        "attendees": [{"email": email, "displayName": name}] if email else [],
+    }
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.post(
+            f"{GOOGLE_CALENDAR_API}/calendars/primary/events",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+            },
+            json=event,
+        )
+        if resp.status_code != 200:
+            return None
+        return resp.json()
 
 router = APIRouter()
 
@@ -156,13 +219,30 @@ async def chat_stream(slug: str, request: ChatRequest, db: Session = Depends(get
             if parsed.get("token"):
                 full += parsed["token"]
 
-        guard = await check_output(full)
-        if not guard["safe"]:
-            full = guard["sanitized"]
-        elif guard["reason"] == "sanitized":
-            full = guard["sanitized"]
+        booking_match = re.search(r'\[\[BOOK:(.*?)\]\]', full)
+        if booking_match:
+            try:
+                parts = booking_match.group(1).split('|')
+                if len(parts) >= 5:
+                    b_name, b_email, b_start, b_end, b_tz = parts[:5]
+                    result = await _book_calendar_event(widget, db, b_name.strip(), b_email.strip(), b_start.strip(), b_end.strip(), b_tz.strip())
+                    if result:
+                        confirm = f"\n\n✅ Meeting confirmed! Check your calendar."
+                        yield "data: " + json.dumps({"token": confirm}) + "\n\n"
+                    else:
+                        yield "data: " + json.dumps({"token": "\n\n⚠️ Could not book automatically. Please try again."}) + "\n\n"
+            except Exception:
+                pass
 
-        await _log_message(db, widget, request.sessionId, "assistant", full)
+        full_clean = re.sub(r'\[\[BOOK:.*?\]\]', '', full).strip()
+
+        guard = await check_output(full_clean)
+        if not guard["safe"]:
+            full_clean = guard["sanitized"]
+        elif guard["reason"] == "sanitized":
+            full_clean = guard["sanitized"]
+
+        await _log_message(db, widget, request.sessionId, "assistant", full_clean)
 
     return StreamingResponse(
         stream_response(),
