@@ -143,7 +143,7 @@ async def calendar_token(slug: str, db: Session = Depends(get_db)):
 
     now = datetime.now(timezone.utc)
     if widget.google_token_expires_at and widget.google_token_expires_at.replace(tzinfo=timezone.utc) > now:
-    return {"access_token": widget.google_access_token, "email": widget.google_calendar_email}
+        return {"access_token": widget.google_access_token, "email": widget.google_calendar_email}
 
 
 async def _ensure_valid_token(widget: Widget, db: Session) -> str:
