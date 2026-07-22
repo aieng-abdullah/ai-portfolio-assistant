@@ -2,9 +2,11 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from models import ChatRequest, ChatResponse, RateLimitResponse
-from services.chat_proxy import proxy_to_n8n
+from services.chat_proxy import proxy_to_n8n, local_fallback
 from services.llm import call_llm
-from database import get_db, Widget, ChatSession, ChatLog
+from services.input_guard import check_input
+from services.output_guard import check_output
+from database import get_db, Widget, ChatSession, ChatLog, AbuseLog
 
 router = APIRouter()
 
@@ -63,6 +65,17 @@ async def _log_message(db: Session, widget: Widget, session_id: str, role: str, 
     db.commit()
 
 
+async def _log_abuse(db: Session, widget: Widget, session_id: str, reason: str, original: str | None = None):
+    log = AbuseLog(
+        widgetId=widget.id,
+        sessionId=session_id,
+        reason=reason,
+        originalMessage=original[:2000] if original else None,
+    )
+    db.add(log)
+    db.commit()
+
+
 @router.post("/api/chat/{slug}", response_model=ChatResponse)
 async def chat(slug: str, request: ChatRequest, db: Session = Depends(get_db)):
     widget = db.query(Widget).filter(Widget.slug == slug).first()
@@ -78,9 +91,30 @@ async def chat(slug: str, request: ChatRequest, db: Session = Depends(get_db)):
             sessionId=request.sessionId,
         )
 
+    guard = await check_input(request.message)
+    if not guard["clean"]:
+        await _log_abuse(db, widget, request.sessionId, guard["reason"], request.message)
+        return ChatResponse(
+            response="I can't process that request. Please ask something about the portfolio.",
+            sessionId=request.sessionId,
+        )
+
     await _log_message(db, widget, request.sessionId, "user", request.message)
 
     response = await proxy_to_n8n(slug, request.sessionId, request.message, db)
+
+    if response.startswith("Sorry, the AI assistant is temporarily unavailable"):
+        response = await call_llm(slug, request.message, request.sessionId, db)
+
+    if response in ("LLM API key is not configured.", "Sorry, I'm having trouble right now. Please try again later."):
+        response = local_fallback(slug, request.message, db)
+
+    guard = await check_output(response)
+    if not guard["safe"]:
+        await _log_abuse(db, widget, request.sessionId, guard["reason"], response)
+        response = guard["sanitized"]
+    elif guard["reason"] == "sanitized":
+        response = guard["sanitized"]
 
     await _log_message(db, widget, request.sessionId, "assistant", response)
 

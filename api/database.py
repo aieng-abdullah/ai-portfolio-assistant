@@ -67,6 +67,17 @@ class ChatLog(Base):
     widget = relationship("Widget", back_populates="chatLogs")
 
 
+class AbuseLog(Base):
+    __tablename__ = "abuse_logs"
+
+    id = Column(String, primary_key=True, default=lambda: __import__("uuid").uuid4().hex)
+    widgetId = Column(String, ForeignKey("widgets.id"), nullable=False)
+    sessionId = Column(String, nullable=False)
+    reason = Column(String, nullable=False)
+    originalMessage = Column(Text, nullable=True)
+    createdAt = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
 

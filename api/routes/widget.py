@@ -4,10 +4,8 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from database import get_db, Widget
+from database import get_db, Widget, ChatLog, AbuseLog
 from models import WidgetConfigResponse, ProfileResponse
-
-from pydantic import BaseModel
 
 
 class WidgetCreateRequest(BaseModel):

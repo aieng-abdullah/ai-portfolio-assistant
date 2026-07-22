@@ -8,6 +8,7 @@ from database import init_db, get_db
 from models import HealthResponse
 from routes.widget import router as widget_router
 from routes.chat import router as chat_router
+from routes.abuse import router as abuse_router
 
 
 @asynccontextmanager
@@ -33,6 +34,7 @@ app.add_middleware(
 
 app.include_router(widget_router)
 app.include_router(chat_router)
+app.include_router(abuse_router)
 
 
 @app.get("/api/health", response_model=HealthResponse)
