@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 
 def test_health_check_connected():
-    from main import health_check
+    from app.main import health_check
     import asyncio
 
     db = MagicMock()
@@ -12,7 +12,7 @@ def test_health_check_connected():
 
 
 def test_health_check_disconnected():
-    from main import health_check
+    from app.main import health_check
     import asyncio
 
     db = MagicMock()
@@ -23,7 +23,7 @@ def test_health_check_disconnected():
 
 
 def test_root():
-    from main import root
+    from app.main import root
     import asyncio
 
     result = asyncio.run(root())

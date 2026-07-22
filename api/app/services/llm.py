@@ -2,8 +2,8 @@ import json
 import logging
 from groq import AsyncGroq
 from sqlalchemy.orm import Session
-from database import Widget
-from config import get_settings
+from app.database import Widget
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ You may ONLY answer questions about:
 5. Contact information
 
 For ANYTHING else, respond:
-"I'm here to help with questions about {name}'s work and services. Want to know about their projects, skills, or book a meeting?"
+"I can only answer portfolio-related questions about {name}'s skills, projects, services, or meeting booking."
 
 MEETING BOOKING:
 When someone wants to book a meeting:

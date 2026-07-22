@@ -1,6 +1,15 @@
+import json
+from pathlib import Path
 import pytest
 from unittest.mock import MagicMock, AsyncMock
 from datetime import datetime, timezone
+
+FIXTURE_DIR = Path(__file__).parent / "fixtures"
+
+
+def load_json_fixture(filename: str) -> dict:
+    with open(FIXTURE_DIR / filename, "r", encoding="utf-8") as handle:
+        return json.load(handle)
 
 
 class MockWidget:
@@ -74,7 +83,25 @@ def create_mock_db_for_chat(widget=None, session=None, message_count=0):
 
 @pytest.fixture
 def sample_widget():
-    return MockWidget()
+    data = load_json_fixture("sample_widget.json")
+    return MockWidget(
+        id=data["id"],
+        slug=data["slug"],
+        name=data["name"],
+        profile=data["profile"],
+        projects=data["projects"],
+        services=data["services"],
+        faq=data["faq"],
+        personality=data["personality"],
+        theme=data["theme"],
+        rateLimit=data["rateLimit"],
+        dailyMessageLimit=data["dailyMessageLimit"],
+        isActive=data["isActive"],
+        google_calendar_email=data["google_calendar_email"],
+        google_access_token=data["google_access_token"],
+        google_refresh_token=data["google_refresh_token"],
+        google_token_expires_at=data["google_token_expires_at"],
+    )
 
 
 @pytest.fixture

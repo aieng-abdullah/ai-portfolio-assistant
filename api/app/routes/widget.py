@@ -4,8 +4,8 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from database import get_db, Widget, ChatLog, AbuseLog
-from models import WidgetConfigResponse, ProfileResponse
+from app.database import get_db, Widget, ChatLog, AbuseLog
+from app.models import WidgetConfigResponse, ProfileResponse
 
 
 class WidgetCreateRequest(BaseModel):
@@ -175,7 +175,7 @@ async def _ensure_valid_token(widget: Widget, db: Session) -> str:
     if widget.google_token_expires_at and widget.google_token_expires_at.replace(tzinfo=timezone.utc) > now:
         return widget.google_access_token
 
-    from config import get_settings
+    from app.config import get_settings
     settings = get_settings()
 
     async with httpx.AsyncClient(timeout=10.0) as client:
@@ -192,10 +192,11 @@ async def _ensure_valid_token(widget: Widget, db: Session) -> str:
             raise HTTPException(status_code=502, detail="Failed to refresh Google token")
         token_data = response.json()
 
-    widget.google_access_token = token_data["access_token"]
+    token = token_data["access_token"]
+    widget.google_access_token = token
     widget.google_token_expires_at = now + timedelta(seconds=token_data.get("expires_in", 3600))
     db.commit()
-    return widget.google_access_token
+    return token
 
 
 class CalendarBookRequest(BaseModel):
@@ -260,26 +261,3 @@ async def calendar_book(slug: str, data: CalendarBookRequest, db: Session = Depe
         "start": result.get("start", {}).get("dateTime"),
         "end": result.get("end", {}).get("dateTime"),
     }
-
-    from config import get_settings
-    settings = get_settings()
-
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.post(
-            GOOGLE_TOKEN_URL,
-            data={
-                "client_id": settings.google_oauth_client_id,
-                "client_secret": settings.google_oauth_client_secret,
-                "refresh_token": widget.google_refresh_token,
-                "grant_type": "refresh_token",
-            },
-        )
-        if response.status_code != 200:
-            raise HTTPException(status_code=502, detail="Failed to refresh Google token")
-        token_data = response.json()
-
-    widget.google_access_token = token_data["access_token"]
-    widget.google_token_expires_at = now + timedelta(seconds=token_data.get("expires_in", 3600))
-    db.commit()
-
-    return {"access_token": widget.google_access_token, "email": widget.google_calendar_email}
