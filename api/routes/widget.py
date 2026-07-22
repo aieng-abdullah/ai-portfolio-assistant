@@ -12,6 +12,12 @@ class WidgetCreateRequest(BaseModel):
     name: str = "My Portfolio"
 
 
+class WidgetUpdateRequest(BaseModel):
+    rateLimit: int | None = None
+    dailyMessageLimit: int | None = None
+    isActive: bool | None = None
+
+
 router = APIRouter()
 
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -47,6 +53,24 @@ async def create_widget(slug: str, data: WidgetCreateRequest = None, db: Session
     db.commit()
     db.refresh(widget)
     return {"slug": widget.slug, "name": widget.name, "id": widget.id}
+
+
+@router.put("/api/widget/{slug}")
+async def update_widget(slug: str, data: WidgetUpdateRequest, db: Session = Depends(get_db)):
+    widget = _get_widget_or_404(db, slug)
+    if data.rateLimit is not None:
+        widget.rateLimit = data.rateLimit
+    if data.dailyMessageLimit is not None:
+        widget.dailyMessageLimit = data.dailyMessageLimit
+    if data.isActive is not None:
+        widget.isActive = data.isActive
+    db.commit()
+    return {
+        "slug": widget.slug,
+        "rateLimit": widget.rateLimit,
+        "dailyMessageLimit": widget.dailyMessageLimit,
+        "isActive": widget.isActive,
+    }
 
 
 @router.get("/api/widget/{slug}/config", response_model=WidgetConfigResponse)
