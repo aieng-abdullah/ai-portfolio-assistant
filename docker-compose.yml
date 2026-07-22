@@ -82,22 +82,6 @@ services:
     networks:
       - backend
 
-  streamlit:
-    build:
-      context: ./streamlit
-      dockerfile: Dockerfile
-    container_name: ai-portfolio-streamlit
-    restart: unless-stopped
-    ports:
-      - "8501:8501"
-    environment:
-      - API_URL=http://api:3000
-    depends_on:
-      api:
-        condition: service_healthy
-    networks:
-      - backend
-
 networks:
   backend:
     driver: bridge

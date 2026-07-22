@@ -7,6 +7,13 @@ from pydantic import BaseModel
 from database import get_db, Widget
 from models import WidgetConfigResponse, ProfileResponse
 
+from pydantic import BaseModel
+
+
+class WidgetCreateRequest(BaseModel):
+    name: str = "My Portfolio"
+
+
 router = APIRouter()
 
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -30,6 +37,18 @@ def _parse_json(value, default=None):
         except (json.JSONDecodeError, TypeError):
             return default
     return value if value else default
+
+
+@router.post("/api/widget/{slug}/create")
+async def create_widget(slug: str, data: WidgetCreateRequest = None, db: Session = Depends(get_db)):
+    existing = db.query(Widget).filter(Widget.slug == slug).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Widget '{slug}' already exists")
+    widget = Widget(slug=slug, name=data.name if data else "My Portfolio")
+    db.add(widget)
+    db.commit()
+    db.refresh(widget)
+    return {"slug": widget.slug, "name": widget.name, "id": widget.id}
 
 
 @router.get("/api/widget/{slug}/config", response_model=WidgetConfigResponse)

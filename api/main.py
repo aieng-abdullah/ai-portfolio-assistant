@@ -8,8 +8,6 @@ from database import init_db, get_db
 from models import HealthResponse
 from routes.widget import router as widget_router
 from routes.chat import router as chat_router
-from routes.admin import router as admin_router
-from routes.abuse import router as abuse_router
 
 
 @asynccontextmanager
@@ -35,8 +33,6 @@ app.add_middleware(
 
 app.include_router(widget_router)
 app.include_router(chat_router)
-app.include_router(admin_router)
-app.include_router(abuse_router)
 
 
 @app.get("/api/health", response_model=HealthResponse)
@@ -61,18 +57,3 @@ async def health_check(db: Session = Depends(get_db)):
 @app.get("/")
 async def root():
     return {"message": "AI Portfolio Assistant API", "docs": "/docs"}
-
-
-@app.get("/api/debug/{slug}")
-async def debug_widget(slug: str, db: Session = Depends(get_db)):
-    from database import Widget
-    import json
-    widget = db.query(Widget).filter(Widget.slug == slug).first()
-    if not widget:
-        return {"error": "not found"}
-    return {
-        "slug": widget.slug,
-        "name": widget.name,
-        "profile_raw": repr(widget.profile[:200] if widget.profile else None),
-        "profile_type": str(type(widget.profile)),
-    }

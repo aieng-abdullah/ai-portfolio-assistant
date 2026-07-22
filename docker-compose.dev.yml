@@ -70,22 +70,6 @@ services:
       n8n:
         condition: service_healthy
 
-  streamlit:
-    build:
-      context: ./streamlit
-      dockerfile: Dockerfile
-    container_name: ai-portfolio-streamlit-dev
-    restart: unless-stopped
-    ports:
-      - "8501:8501"
-    environment:
-      - API_URL=http://api:3000
-    volumes:
-      - ./streamlit:/app
-    depends_on:
-      api:
-        condition: service_started
-
 volumes:
   n8n_data:
   postgres_data:
