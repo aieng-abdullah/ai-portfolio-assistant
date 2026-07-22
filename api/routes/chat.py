@@ -136,7 +136,7 @@ async def chat_stream(slug: str, request: ChatRequest, db: Session = Depends(get
         async def limit_gen():
             yield "data: " + json.dumps({"token": "You've reached the chat limit. Please try again later."}) + "\n\n"
             yield "data: " + json.dumps({"done": True}) + "\n\n"
-        return StreamingResponse(limit_gen(), media_type="text/event-stream")
+        return StreamingResponse(limit_gen(), media_type="text/event-stream", headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
 
     guard = await check_input(request.message)
     if not guard["clean"]:
@@ -144,7 +144,7 @@ async def chat_stream(slug: str, request: ChatRequest, db: Session = Depends(get
         async def blocked_gen():
             yield "data: " + json.dumps({"token": "I can't process that request. Please ask something about the portfolio."}) + "\n\n"
             yield "data: " + json.dumps({"done": True}) + "\n\n"
-        return StreamingResponse(blocked_gen(), media_type="text/event-stream")
+        return StreamingResponse(blocked_gen(), media_type="text/event-stream", headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
 
     await _log_message(db, widget, request.sessionId, "user", request.message)
 
@@ -164,7 +164,15 @@ async def chat_stream(slug: str, request: ChatRequest, db: Session = Depends(get
 
         await _log_message(db, widget, request.sessionId, "assistant", full)
 
-    return StreamingResponse(stream_response(), media_type="text/event-stream")
+    return StreamingResponse(
+        stream_response(),
+        media_type="text/event-stream",
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @router.get("/api/widget/{slug}/rate-limit", response_model=RateLimitResponse)
