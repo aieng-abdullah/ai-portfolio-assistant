@@ -7,10 +7,10 @@
 
 ## What This Project Is
 
-A **SaaS platform** that lets users add an AI-powered chat widget to their website.
-Visitors can ask questions about the portfolio owner, view projects/services, and book meetings.
+A **SaaS platform** that provides a REST API for AI-powered chat.
+Clients call the API from their own frontend to let visitors ask questions about the portfolio owner, view projects/services, and book meetings.
 
-**Current state:** Prototype (local dev works, no auth, no payment yet).
+**Current state:** API-only (no auth, no payment yet).
 
 ---
 
@@ -19,7 +19,7 @@ Visitors can ask questions about the portfolio owner, view projects/services, an
 | Layer | Tech | Notes |
 |-------|------|-------|
 | API Backend | **FastAPI** (Python) | `api/main.py` entry point |
-| Database | **SQLAlchemy + SQLite** (dev) / **PostgreSQL** (prod) | `api/database.py` |
+| Database | **SQLAlchemy + PostgreSQL** | `api/database.py` |
 | AI Workflow | **n8n** | `n8n/workflows/AI Portfolio Assistant v2.json` |
 | LLM | **Groq** | Model: `openai/gpt-oss-120b` |
 | Prototype Dashboard | **Streamlit** | `streamlit/app.py` |
@@ -32,9 +32,9 @@ Visitors can ask questions about the portfolio owner, view projects/services, an
 ```
 ai-portfolio-assistant/
 ├── api/                        # FastAPI backend (MAIN CODEBASE)
-│   ├── main.py                 # App entry, routes, widget serving
+│   ├── main.py                 # App entry, routes
 │   ├── config.py               # Environment variables
-│   ├── database.py             # SQLAlchemy models + connection
+│   ├── database.py             # SQLAlchemy + PostgreSQL connection
 │   ├── models.py               # Pydantic request/response models
 │   ├── routes/
 │   │   ├── widget.py           # GET /api/widget/{slug}/config, /profile, /projects, /services, /faq
@@ -43,10 +43,7 @@ ai-portfolio-assistant/
 │   │   └── abuse.py            # POST /abuse-log
 │   ├── services/
 │   │   └── chat_proxy.py       # n8n proxy + local fallback + rate limiting
-│   ├── static/
-│   │   ├── widget.js           # Embeddable loader script (runs on user's website)
-│   │   └── widget.html         # Chat UI template (loaded in iframe)
-│   ├── tests/                  # 24 passing tests
+│   ├── tests/                  # Tests
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   └── pyproject.toml          # pytest config
@@ -85,17 +82,16 @@ ai-portfolio-assistant/
 
 ### 2. Chat Flow
 ```
-User's website → widget.js → iframe /widget/{slug}
-  → POST /api/chat/{slug}
-    → Rate limit check (SQLAlchemy)
-    → Guard input (injection, spam, length)
-    → Log message to DB
-    → Try n8n webhook (10s timeout)
-      → If n8n available: AI Agent processes with Groq LLM
-      → If n8n down: Local fallback (keyword-based responses)
-    → Guard output (data leaks, prompt leaks)
-    → Log response to DB
-    → Return to user
+Client's frontend → POST /api/chat/{slug}
+  → Rate limit check (SQLAlchemy)
+  → Guard input (injection, spam, length)
+  → Log message to DB
+  → Try n8n webhook (10s timeout)
+    → If n8n available: AI Agent processes with Groq LLM
+    → If n8n down: Local fallback (keyword-based responses)
+  → Guard output (data leaks, prompt leaks)
+  → Log response to DB
+  → Return to client
 ```
 
 ### 3. Local Fallback Mode
@@ -112,16 +108,6 @@ When n8n is not running, `chat_proxy.py` uses `_local_fallback()` which:
 5. **Rate Limiting** — Per-session (30/hr) + per-widget (1000/day), configurable
 6. **Abuse Logger** — Flags suspicious activity
 7. **Kill Switch** — Disable widget instantly via admin endpoint
-
-### 5. Embeddable Widget
-Users add ONE line to their website:
-```html
-<script src="https://app.yourdomain.com/widget.js" data-widget-id="abc123" async></script>
-```
-- `widget.js` creates a floating chat bubble
-- Click opens an iframe pointing to `/widget/{slug}`
-- The iframe loads `widget.html` which fetches config from the API
-- All styling is isolated in the iframe (no conflicts with host site)
 
 ---
 
@@ -151,11 +137,9 @@ Users add ONE line to their website:
 | GET | `/api/admin/widget/{slug}/stats` | Chat statistics |
 | POST | `/api/widget/{slug}/abuse-log` | Log abuse |
 
-### Widget Serving
+### Health
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/widget.js` | Loader script |
-| GET | `/widget/{slug}` | Chat UI (iframe) |
 | GET | `/api/health` | Health check |
 
 ---
@@ -188,7 +172,6 @@ python -m uvicorn main:app --host 0.0.0.0 --port 3000 --reload
 ```
 - API: http://localhost:3000
 - API Docs: http://localhost:3000/docs
-- Widget: http://localhost:3000/widget/my-portfolio
 
 ### With Docker
 ```bash
@@ -220,7 +203,7 @@ python -m pytest tests/ -v
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `DATABASE_URL` | `sqlite:///./portfolio.db` | Database connection |
+| `DATABASE_URL` | `postgresql://portfolio:portfolio_dev@localhost:5432/portfolio` | Database connection |
 | `N8N_WEBHOOK_URL` | `http://localhost:5678/webhook/` | n8n webhook endpoint |
 | `GROQ_API_KEY` | (empty) | Groq LLM API key |
 | `API_PORT` | `3000` | API server port |
@@ -258,7 +241,7 @@ See `docs/future-plan.md` for full list. Key items:
 | Chat returns "temporarily unavailable" | n8n not running — local fallback should work, or start n8n |
 | "Widget not found" | Create widget via `POST /api/widget/{slug}/create` |
 | Import errors | Run `pip install -r requirements.txt` |
-| Database errors | Delete `portfolio.db` and restart (SQLite resets) |
+| Database errors | Check PostgreSQL is running: `docker compose up -d postgres` |
 | Tests fail | Make sure you're in `api/` directory, run `pip install pytest pytest-asyncio` |
 
 ---

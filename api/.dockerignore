@@ -10,5 +10,6 @@ venv
 .gitignore
 .env
 *.log
+*.db
 .vscode
 .idea

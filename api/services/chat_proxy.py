@@ -1,9 +1,7 @@
 import httpx
 import json
-import re
-from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
-from database import get_db, Widget, ChatSession, ChatLog
+from database import Widget
 from config import get_settings
 
 
@@ -18,7 +16,7 @@ def _parse_json(value, default=None):
     return value if value else default
 
 
-def _local_fallback(slug: str, message: str, db: Session) -> str:
+def local_fallback(slug: str, message: str, db: Session) -> str:
     widget = db.query(Widget).filter(Widget.slug == slug).first()
     if not widget:
         return "I don't have any information about this portfolio."
@@ -101,6 +99,7 @@ async def proxy_to_n8n(slug: str, session_id: str, message: str, db: Session = N
                     "chatInput": message,
                     "sessionId": session_id,
                     "slug": slug,
+                    "groqApiKey": settings.groq_api_key,
                 },
                 headers={"Content-Type": "application/json"},
             )
@@ -110,5 +109,5 @@ async def proxy_to_n8n(slug: str, session_id: str, message: str, db: Session = N
     except (httpx.TimeoutException, httpx.HTTPStatusError, httpx.ConnectError, Exception):
         # n8n not available — use local fallback
         if db:
-            return _local_fallback(slug, message, db)
+            return local_fallback(slug, message, db)
         return "Sorry, the AI assistant is temporarily unavailable. Please try again later."

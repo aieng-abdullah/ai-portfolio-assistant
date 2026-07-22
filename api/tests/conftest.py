@@ -1,14 +1,6 @@
-import sys
 import pytest
 from unittest.mock import MagicMock, AsyncMock
 from datetime import datetime, timezone
-
-# Mock prisma before any app imports
-mock_prisma_module = MagicMock()
-mock_prisma_instance = MagicMock()
-mock_prisma_module.Prisma.return_value = mock_prisma_instance
-sys.modules["prisma"] = mock_prisma_module
-sys.modules["prisma.models"] = MagicMock()
 
 
 class MockWidget:
@@ -28,6 +20,10 @@ class MockWidget:
         self.createdAt = kwargs.get("createdAt", datetime.now(timezone.utc))
         self.updatedAt = kwargs.get("updatedAt", datetime.now(timezone.utc))
         self.userId = kwargs.get("userId", "test-user-id")
+        self.google_calendar_email = kwargs.get("google_calendar_email", None)
+        self.google_access_token = kwargs.get("google_access_token", None)
+        self.google_refresh_token = kwargs.get("google_refresh_token", None)
+        self.google_token_expires_at = kwargs.get("google_token_expires_at", None)
 
 
 class MockChatSession:
@@ -40,9 +36,40 @@ class MockChatSession:
         self.createdAt = kwargs.get("createdAt", datetime.now(timezone.utc))
 
 
-@pytest.fixture
-def mock_prisma():
-    return mock_prisma_instance
+def create_mock_db(widget=None):
+    """Create a mock SQLAlchemy session that returns the given widget on query()."""
+    db = MagicMock()
+    query_mock = MagicMock()
+    filter_mock = MagicMock()
+
+    if widget is not None:
+        filter_mock.first.return_value = widget
+    else:
+        filter_mock.first.return_value = None
+
+    query_mock.filter.return_value = filter_mock
+    db.query.return_value = query_mock
+    return db
+
+
+def create_mock_db_for_chat(widget=None, session=None, message_count=0):
+    """Create a mock DB that handles chat-specific queries (rate limiting, logging)."""
+    db = MagicMock()
+
+    def query_side_effect(model):
+        q = MagicMock()
+        f = MagicMock()
+        if model.__name__ == "Widget" or (hasattr(model, '__name__') and model.__name__ == "Widget"):
+            f.first.return_value = widget
+        elif model.__name__ == "ChatSession" or (hasattr(model, '__name__') and model.__name__ == "ChatSession"):
+            f.first.return_value = session
+        else:
+            f.count.return_value = message_count
+        q.filter.return_value = f
+        return q
+
+    db.query.side_effect = query_side_effect
+    return db
 
 
 @pytest.fixture

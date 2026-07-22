@@ -7,9 +7,7 @@ Production:  https://app.yourdomain.com
 ```
 
 ## Authentication
-- Widget endpoints (`/api/widget/*`): Public (serving widget data)
-- Admin endpoints (`/api/admin/*`): Bearer token required
-- Chat endpoint (`/api/chat/*`): Public (rate limited)
+All endpoints are public (rate limited on chat). Auth will be added by web developer.
 
 ---
 
@@ -119,72 +117,26 @@ Send a chat message. Proxies to n8n.
 }
 ```
 
-### POST `/api/widget/{slug}/log`
-Log a chat message (called by n8n).
+---
+
+## Widget Management
+
+### POST `/api/widget/{slug}/create`
+Create a new widget with the given slug.
 
 **Request:**
 ```json
 {
-  "sessionId": "abc-123",
-  "role": "user",
-  "message": "Hello"
+  "name": "My Portfolio"
 }
 ```
-
-### POST `/api/widget/{slug}/abuse-log`
-Log abuse attempt.
-
-**Request:**
-```json
-{
-  "sessionId": "abc-123",
-  "filtered": true,
-  "timestamp": "2026-07-20T12:00:00Z"
-}
-```
-
----
-
-## Widget Serving
-
-### GET `/widget.js`
-Serves the loader script (minified in production).
-
-### GET `/widget/{slug}`
-Serves the chat UI HTML page (loaded in iframe).
-
----
-
-## Admin Endpoints
-
-### POST `/api/admin/widget/{slug}/disable`
-Disable a widget (kill switch).
 
 **Response:**
 ```json
 {
-  "message": "Widget 'abc123' disabled",
-  "isActive": false
-}
-```
-
-### POST `/api/admin/widget/{slug}/enable`
-Re-enable a widget.
-
-### GET `/api/admin/widget/{slug}/stats`
-Get chat statistics.
-
-**Response:**
-```json
-{
-  "slug": "abc123",
-  "isActive": true,
-  "rateLimit": 30,
-  "dailyMessageLimit": 1000,
-  "totalMessages": 1234,
-  "hourlyMessages": 45,
-  "dailyMessages": 320,
-  "activeSessions": 12
+  "slug": "my-portfolio",
+  "name": "My Portfolio",
+  "id": "abc123"
 }
 ```
 

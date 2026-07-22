@@ -1,17 +1,10 @@
 from pydantic import BaseModel
-from typing import Optional, Any
-from datetime import datetime
+from typing import Optional
 
 
 # Request Models
 class ChatRequest(BaseModel):
     sessionId: str
-    message: str
-
-
-class LogRequest(BaseModel):
-    sessionId: str
-    role: str
     message: str
 
 

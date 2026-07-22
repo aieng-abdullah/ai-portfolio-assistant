@@ -3,12 +3,12 @@ from sqlalchemy import create_engine, Column, String, Integer, Boolean, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from datetime import datetime, timezone
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./portfolio.db")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://portfolio:portfolio_dev@localhost:5432/portfolio"
+)
 
-if DATABASE_URL.startswith("sqlite"):
-    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-else:
-    engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -65,6 +65,17 @@ class ChatLog(Base):
     createdAt = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     widget = relationship("Widget", back_populates="chatLogs")
+
+
+class AbuseLog(Base):
+    __tablename__ = "abuse_logs"
+
+    id = Column(String, primary_key=True, default=lambda: __import__("uuid").uuid4().hex)
+    widgetId = Column(String, ForeignKey("widgets.id"), nullable=False)
+    sessionId = Column(String, nullable=False)
+    reason = Column(String, nullable=False)
+    originalMessage = Column(Text, nullable=True)
+    createdAt = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 def init_db():
