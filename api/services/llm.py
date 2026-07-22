@@ -101,3 +101,45 @@ async def call_llm(slug: str, message: str, session_id: str, db: Session) -> str
     except Exception as e:
         logger.exception("Groq API error")
         return f"Sorry, I'm having trouble right now. Please try again later."
+
+
+async def call_llm_stream(slug: str, message: str, session_id: str, db: Session):
+    settings = get_settings()
+
+    if not settings.groq_api_key:
+        logger.error("Groq API key not configured")
+        yield "data: " + json.dumps({"error": "LLM API key is not configured."}) + "\n\n"
+        return
+
+    widget = db.query(Widget).filter(Widget.slug == slug).first()
+    if not widget:
+        yield "data: " + json.dumps({"error": "Widget not found."}) + "\n\n"
+        return
+
+    system_prompt = _build_system_prompt(widget)
+
+    try:
+        client = AsyncGroq(api_key=settings.groq_api_key)
+        stream = await client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": message},
+            ],
+            model="llama-3.3-70b-versatile",
+            temperature=0.7,
+            max_tokens=500,
+            stream=True,
+        )
+
+        full_response = ""
+        async for chunk in stream:
+            token = chunk.choices[0].delta.content or ""
+            if token:
+                full_response += token
+                yield "data: " + json.dumps({"token": token}) + "\n\n"
+
+        yield "data: " + json.dumps({"done": True, "fullResponse": full_response}) + "\n\n"
+
+    except Exception as e:
+        logger.exception("Groq streaming API error")
+        yield "data: " + json.dumps({"error": "Sorry, I'm having trouble right now. Please try again later."}) + "\n\n"

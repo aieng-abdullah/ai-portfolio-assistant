@@ -1,9 +1,11 @@
+import json
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from models import ChatRequest, ChatResponse, RateLimitResponse
 from services.chat_proxy import proxy_to_n8n, local_fallback
-from services.llm import call_llm
+from services.llm import call_llm, call_llm_stream
 from services.input_guard import check_input
 from services.output_guard import check_output
 from database import get_db, Widget, ChatSession, ChatLog, AbuseLog
@@ -119,6 +121,50 @@ async def chat(slug: str, request: ChatRequest, db: Session = Depends(get_db)):
     await _log_message(db, widget, request.sessionId, "assistant", response)
 
     return ChatResponse(response=response, sessionId=request.sessionId)
+
+
+@router.post("/api/chat/{slug}/stream")
+async def chat_stream(slug: str, request: ChatRequest, db: Session = Depends(get_db)):
+    widget = db.query(Widget).filter(Widget.slug == slug).first()
+    if not widget:
+        raise HTTPException(status_code=404, detail=f"Widget '{slug}' not found")
+    if not widget.isActive:
+        raise HTTPException(status_code=403, detail="Chat is temporarily unavailable")
+
+    limits = await _check_rate_limit(db, widget, request.sessionId)
+    if limits.get("over_limit"):
+        async def limit_gen():
+            yield "data: " + json.dumps({"token": "You've reached the chat limit. Please try again later."}) + "\n\n"
+            yield "data: " + json.dumps({"done": True}) + "\n\n"
+        return StreamingResponse(limit_gen(), media_type="text/event-stream")
+
+    guard = await check_input(request.message)
+    if not guard["clean"]:
+        await _log_abuse(db, widget, request.sessionId, guard["reason"], request.message)
+        async def blocked_gen():
+            yield "data: " + json.dumps({"token": "I can't process that request. Please ask something about the portfolio."}) + "\n\n"
+            yield "data: " + json.dumps({"done": True}) + "\n\n"
+        return StreamingResponse(blocked_gen(), media_type="text/event-stream")
+
+    await _log_message(db, widget, request.sessionId, "user", request.message)
+
+    async def stream_response():
+        full = ""
+        async for event in call_llm_stream(slug, request.message, request.sessionId, db):
+            yield event
+            parsed = json.loads(event[6:].strip())
+            if parsed.get("token"):
+                full += parsed["token"]
+
+        guard = await check_output(full)
+        if not guard["safe"]:
+            full = guard["sanitized"]
+        elif guard["reason"] == "sanitized":
+            full = guard["sanitized"]
+
+        await _log_message(db, widget, request.sessionId, "assistant", full)
+
+    return StreamingResponse(stream_response(), media_type="text/event-stream")
 
 
 @router.get("/api/widget/{slug}/rate-limit", response_model=RateLimitResponse)
