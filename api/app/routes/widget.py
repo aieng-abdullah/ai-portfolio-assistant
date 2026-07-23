@@ -4,6 +4,7 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from typing import Any
 from app.database import get_db, Widget, ChatLog, AbuseLog
 from app.models import WidgetConfigResponse, ProfileResponse
 
@@ -13,9 +14,16 @@ class WidgetCreateRequest(BaseModel):
 
 
 class WidgetUpdateRequest(BaseModel):
+    name: str | None = None
     rateLimit: int | None = None
     dailyMessageLimit: int | None = None
     isActive: bool | None = None
+    profile: Any | None = None
+    projects: Any | None = None
+    services: Any | None = None
+    faq: Any | None = None
+    theme: Any | None = None
+    personality: Any | None = None
 
 
 router = APIRouter()
@@ -55,18 +63,41 @@ async def create_widget(slug: str, data: WidgetCreateRequest = None, db: Session
     return {"slug": widget.slug, "name": widget.name, "id": widget.id}
 
 
+def _to_json_str(value):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, ensure_ascii=False, default=str)
+
+
 @router.put("/api/widget/{slug}")
 async def update_widget(slug: str, data: WidgetUpdateRequest, db: Session = Depends(get_db)):
     widget = _get_widget_or_404(db, slug)
+    if data.name is not None:
+        widget.name = data.name
     if data.rateLimit is not None:
         widget.rateLimit = data.rateLimit
     if data.dailyMessageLimit is not None:
         widget.dailyMessageLimit = data.dailyMessageLimit
     if data.isActive is not None:
         widget.isActive = data.isActive
+    if data.profile is not None:
+        widget.profile = _to_json_str(data.profile)
+    if data.projects is not None:
+        widget.projects = _to_json_str(data.projects)
+    if data.services is not None:
+        widget.services = _to_json_str(data.services)
+    if data.faq is not None:
+        widget.faq = _to_json_str(data.faq)
+    if data.theme is not None:
+        widget.theme = _to_json_str(data.theme)
+    if data.personality is not None:
+        widget.personality = _to_json_str(data.personality)
     db.commit()
     return {
         "slug": widget.slug,
+        "name": widget.name,
         "rateLimit": widget.rateLimit,
         "dailyMessageLimit": widget.dailyMessageLimit,
         "isActive": widget.isActive,
