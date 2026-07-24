@@ -230,6 +230,11 @@ async def _ensure_valid_token(widget: Widget, db: Session) -> str:
     return token
 
 
+class CalendarCheckRequest(BaseModel):
+    start_time: str
+    end_time: str
+
+
 class CalendarBookRequest(BaseModel):
     summary: str
     description: str = ""
@@ -241,6 +246,46 @@ class CalendarBookRequest(BaseModel):
 
 
 GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3"
+
+
+@router.post("/api/widget/{slug}/calendar/available")
+async def calendar_available(slug: str, data: CalendarCheckRequest, db: Session = Depends(get_db)):
+    widget = _get_widget_or_404(db, slug)
+    if not widget.google_access_token or not widget.google_refresh_token:
+        raise HTTPException(status_code=400, detail="Calendar not connected. Set up OAuth first.")
+
+    access_token = await _ensure_valid_token(widget, db)
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        response = await client.post(
+            f"{GOOGLE_CALENDAR_API}/freeBusy",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "timeMin": data.start_time,
+                "timeMax": data.end_time,
+                "timeZone": "UTC",
+            },
+        )
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to check availability: {response.text}",
+            )
+        result = response.json()
+
+    busy_slots = []
+    for cal_id, cal_data in result.get("calendars", {}).items():
+        for busy in cal_data.get("busy", []):
+            busy_slots.append({"start": busy.get("start"), "end": busy.get("end")})
+
+    return {
+        "available": len(busy_slots) == 0,
+        "busy_slots": busy_slots,
+        "checked_range": {"start": data.start_time, "end": data.end_time},
+    }
 
 
 @router.post("/api/widget/{slug}/calendar/book")

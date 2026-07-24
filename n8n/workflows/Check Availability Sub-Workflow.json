@@ -1,0 +1,82 @@
+{
+  "name": "Check Availability Sub-Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "check-availability",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "sub-trigger",
+      "name": "When called",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "check-availability"
+    },
+    {
+      "parameters": {
+        "resource": "calendar",
+        "calendarId": "primary",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 100,
+        "start": "={{ $json.body?.start_time }}",
+        "end": "={{ $json.body?.end_time }}"
+      },
+      "id": "get-events",
+      "name": "Get Calendar Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [220, 300],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+          "name": "Google Calendar OAuth2 account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const events = $input.all();\nconst busySlots = events.map(e => ({\n  start: e.json.start?.dateTime || e.json.start?.date,\n  end: e.json.end?.dateTime || e.json.end?.date,\n  summary: e.json.summary || 'Busy'\n}));\n\nreturn [{ json: {\n  available: busySlots.length === 0,\n  busy_slots: busySlots,\n  message: busySlots.length === 0\n    ? 'The time slot is available.'\n    : 'The time slot has ' + busySlots.length + ' existing event(s).'\n}}];"
+      },
+      "id": "format-response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { output: JSON.stringify($json) } }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [660, 300]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When called": {
+      "main": [[{ "node": "Get Calendar Events", "type": "main", "index": 0 }]]
+    },
+    "Get Calendar Events": {
+      "main": [[{ "node": "Format Response", "type": "main", "index": 0 }]]
+    },
+    "Format Response": {
+      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "check-availability-v1",
+  "meta": { "templateCredsSetupCompleted": false },
+  "nodeGroups": [],
+  "id": "check-availability-sub",
+  "tags": []
+}

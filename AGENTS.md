@@ -20,7 +20,7 @@ Clients call the API from their own frontend to let visitors ask questions about
 |-------|------|-------|
 | API Backend | **FastAPI** (Python) | `api/main.py` entry point |
 | Database | **SQLAlchemy + PostgreSQL** | `api/database.py` |
-| AI Workflow | **n8n** | `n8n/workflows/AI Portfolio Assistant v2.json` |
+| AI Workflow | **n8n** | `n8n/workflows/AI Portfolio Assistant v3.json` |
 | LLM | **Groq** | Model: `openai/gpt-oss-120b` |
 | Prototype Dashboard | **Streamlit** | `streamlit/app.py` |
 | Deploy | **Docker Compose** | `docker-compose.yml` (prod), `docker-compose.dev.yml` (dev) |
@@ -51,8 +51,8 @@ ai-portfolio-assistant/
 │   └── schema.prisma           # DB schema (reference only, not used at runtime)
 ├── n8n/
 │   └── workflows/
-│       ├── AI Portfolio Assistant .json    # Original v1 workflow
-│       └── AI Portfolio Assistant v2.json  # Multi-tenant v2 (USE THIS)
+│       ├── AI Portfolio Assistant v3.json    # Agent orchestrator + multi-tenant (USE THIS)
+│       └── Book Meeting Sub-Workflow.json    # Meeting booking sub-workflow
 ├── streamlit/                  # Prototype dashboard (demo tool, NOT production)
 │   ├── app.py
 │   └── pages/

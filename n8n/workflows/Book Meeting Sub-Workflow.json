@@ -1,0 +1,139 @@
+{
+  "name": "Book Meeting Sub-Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "book-meeting",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "sub-trigger",
+      "name": "When called",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "book-meeting"
+    },
+    {
+      "parameters": {
+        "jsCode": "const slug = $json.body?.slug || $json.slug || '';\nconst clientName = $json.body?.client_name || $json.client_name || '';\nconst clientEmail = $json.body?.client_email || $json.client_email || '';\nconst startDate = $json.body?.start_time || $json.start_time || '';\nconst endDate = $json.body?.end_time || $json.end_time || '';\nconst duration = $json.body?.duration || $json.duration || '30 minutes';\n\nconst baseUrl = 'http://api:3000/api/widget/' + slug;\n\nconst payload = {\n  summary: 'Meeting with ' + clientName,\n  description: 'Duration: ' + duration,\n  start_time: startDate,\n  end_time: endDate,\n  attendee_name: clientName,\n  attendee_email: clientEmail,\n  timezone: 'UTC'\n};\n\nreturn [{ json: { slug, baseUrl, payload } }];"
+      },
+      "id": "build-booking",
+      "name": "Build Booking",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.baseUrl }}/calendar/book",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": []
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "call-api",
+      "name": "Call Calendar API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $json;\nconst clientName = $('Build Booking').item.json.payload.attendee_name;\n\nif (response.event_id) {\n  return [{ json: {\n    success: true,\n    message: 'Meeting booked successfully with ' + clientName + '. Event link: ' + (response.html_link || 'N/A'),\n    event_id: response.event_id,\n    event_link: response.html_link || null\n  }}];\n} else {\n  return [{ json: {\n    success: false,\n    message: response.detail || response.message || 'Failed to book meeting. Please try another time.'\n  }}];\n}"
+      },
+      "id": "format-response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { output: $json.message, success: $json.success, event_id: $json.event_id, event_link: $json.event_link } }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, 300]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When called": {
+      "main": [
+        [
+          {
+            "node": "Build Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Booking": {
+      "main": [
+        [
+          {
+            "node": "Call Calendar API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Calendar API": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "book-meeting-v1",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "nodeGroups": [],
+  "id": "book-meeting-sub",
+  "tags": []
+}
