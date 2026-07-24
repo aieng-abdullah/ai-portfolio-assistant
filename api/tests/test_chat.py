@@ -1,17 +1,17 @@
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 from conftest import MockWidget, MockChatSession, create_mock_db, create_mock_db_for_chat
-from models import ChatRequest
+from app.models import ChatRequest
 
 
 @pytest.mark.asyncio
 async def test_chat_success(sample_widget):
     db = create_mock_db_for_chat(widget=sample_widget, session=None, message_count=0)
 
-    with patch("services.chat_proxy.proxy_to_n8n", new_callable=AsyncMock) as mock_proxy:
+    with patch("app.services.chat_proxy.proxy_to_n8n", new_callable=AsyncMock) as mock_proxy:
         mock_proxy.return_value = "I'm a test response"
 
-        from routes.chat import chat
+        from app.routes.chat import chat
         request = ChatRequest(sessionId="session-123", message="Hello")
         result = await chat("test-widget", request, db=db)
 
@@ -23,8 +23,8 @@ async def test_chat_success(sample_widget):
 async def test_chat_widget_not_found():
     db = create_mock_db_for_chat(widget=None)
 
-    from routes.chat import chat
-    from models import ChatRequest
+    from app.routes.chat import chat
+    from app.models import ChatRequest
     from fastapi import HTTPException
 
     request = ChatRequest(sessionId="session-123", message="Hello")
@@ -38,8 +38,8 @@ async def test_chat_widget_inactive():
     widget = MockWidget(isActive=False)
     db = create_mock_db_for_chat(widget=widget)
 
-    from routes.chat import chat
-    from models import ChatRequest
+    from app.routes.chat import chat
+    from app.models import ChatRequest
     from fastapi import HTTPException
 
     request = ChatRequest(sessionId="session-123", message="Hello")
@@ -52,8 +52,8 @@ async def test_chat_widget_inactive():
 async def test_chat_rate_limited(sample_widget):
     db = create_mock_db_for_chat(widget=sample_widget, session=MockChatSession(), message_count=35)
 
-    from routes.chat import chat
-    from models import ChatRequest
+    from app.routes.chat import chat
+    from app.models import ChatRequest
 
     request = ChatRequest(sessionId="session-123", message="Hello")
     result = await chat("test-widget", request, db=db)

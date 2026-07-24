@@ -42,7 +42,7 @@ async def check_output(response: str) -> dict:
             return {
                 "safe": False,
                 "reason": "prompt_leak",
-                "sanitized": "I'm here to help with questions about the portfolio owner's work and services. Want to know about their projects, skills, or book a meeting?",
+                "sanitized": "I can only answer portfolio-related questions about Abdullah's skills, projects, services, or meeting booking.",
             }
 
     if sanitized != response:

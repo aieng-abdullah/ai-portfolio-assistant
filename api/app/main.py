@@ -4,11 +4,12 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
-from database import init_db, get_db
-from models import HealthResponse
-from routes.widget import router as widget_router
-from routes.chat import router as chat_router
-from routes.abuse import router as abuse_router
+from app.database import init_db, get_db
+from app.models import HealthResponse
+from app.routes.widget import router as widget_router
+from app.routes.chat import router as chat_router
+from app.routes.abuse import router as abuse_router
+from app.routes.auth import router as auth_router
 
 
 @asynccontextmanager
@@ -35,6 +36,7 @@ app.add_middleware(
 app.include_router(widget_router)
 app.include_router(chat_router)
 app.include_router(abuse_router)
+app.include_router(auth_router)
 
 
 @app.get("/api/health", response_model=HealthResponse)

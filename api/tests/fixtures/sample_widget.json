@@ -1,0 +1,85 @@
+{
+    "id": "test-widget-id",
+    "slug": "test-widget",
+    "name": "Abdullah Al Arif",
+    "profile": {
+        "name": "Abdullah Al Arif",
+        "title": "Full-stack Developer & AI Engineer",
+        "bio": "Abdullah builds AI-powered portfolio experiences, SaaS backends, and developer tools with a focus on clean architecture and real-world product fit.",
+        "location": "Remote / Global",
+        "skills": [
+            "FastAPI",
+            "Python",
+            "JavaScript",
+            "n8n",
+            "PostgreSQL",
+            "AI workflows"
+        ],
+        "experience": [
+            "Built a multi-tenant AI portfolio chat platform",
+            "Designed production-ready Docker Compose stacks",
+            "Implemented Google Calendar booking integrations"
+        ],
+        "contact": {
+            "email": "abdullah@example.com",
+            "website": "https://abdullah.dev",
+            "linkedin": "https://linkedin.com/in/abdullah-al-arif"
+        }
+    },
+    "projects": [
+        {
+            "name": "AI Portfolio Assistant",
+            "description": "A SaaS backend for portfolio chat widgets with n8n orchestration and calendar booking.",
+            "technologies": [
+                "FastAPI",
+                "PostgreSQL",
+                "n8n",
+                "Docker"
+            ]
+        },
+        {
+            "name": "Developer Dashboard",
+            "description": "A Streamlit prototype dashboard for managing widget content, analytics, and booking settings.",
+            "technologies": [
+                "Streamlit",
+                "Python",
+                "REST APIs"
+            ]
+        }
+    ],
+    "services": [
+        {
+            "name": "Portfolio Chat Assistant",
+            "description": "Deploy a custom AI chat assistant for your portfolio website to answer visitor questions and book meetings."
+        },
+        {
+            "name": "Workflow Automation",
+            "description": "Automate content retrieval and booking flows with n8n and backend orchestration."
+        }
+    ],
+    "faq": [
+        {
+            "question": "What kind of projects has Abdullah built?",
+            "answer": "Abdullah has built AI portfolio assistants, backend APIs, developer dashboards, and workflow automations."
+        },
+        {
+            "question": "Can I book a meeting?",
+            "answer": "Yes — the assistant can help collect your name, email, date, time, and timezone to schedule a meeting."
+        }
+    ],
+    "personality": {
+        "tone": "witty_professional"
+    },
+    "theme": {
+        "primaryColor": "#4F46E5",
+        "secondaryColor": "#FBBF24",
+        "font": "Inter"
+    },
+    "rateLimit": 30,
+    "dailyMessageLimit": 1000,
+    "isActive": true,
+    "google_calendar_email": null,
+    "google_access_token": null,
+    "google_refresh_token": null,
+    "google_token_expires_at": null
+}

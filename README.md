@@ -78,7 +78,7 @@ Services running:
 1. Open http://localhost:5678
 2. Go to Settings → Credentials
 3. Add Groq API credential with your key
-4. Import workflow: `n8n/workflows/AI Portfolio Assistant v2.json`
+4. Import workflow: `n8n/workflows/AI Portfolio Assistant v3.json`
 5. Activate the workflow
 
 ### 5. Create a widget
@@ -133,7 +133,8 @@ ai-portfolio-assistant/
 │   └── requirements.txt
 ├── n8n/
 │   └── workflows/
-│       └── AI Portfolio Assistant v2.json
+│       ├── AI Portfolio Assistant v3.json    # Agent orchestrator + multi-tenant
+│       └── Book Meeting Sub-Workflow.json    # Meeting booking sub-workflow
 ├── streamlit/                  # Prototype dashboard
 │   ├── app.py
 │   └── pages/

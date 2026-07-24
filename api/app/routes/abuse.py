@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from database import get_db, Widget, AbuseLog
+from app.database import get_db, Widget, AbuseLog
 
 router = APIRouter()
 

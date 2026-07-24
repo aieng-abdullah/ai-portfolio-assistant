@@ -1,6 +1,6 @@
 import pytest
-from services.input_guard import check_input, INJECTION_PATTERNS
-from services.output_guard import check_output
+from app.services.input_guard import check_input, INJECTION_PATTERNS
+from app.services.output_guard import check_output
 
 
 @pytest.mark.asyncio

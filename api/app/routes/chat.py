@@ -3,12 +3,12 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from models import ChatRequest, ChatResponse, RateLimitResponse
-from services.chat_proxy import proxy_to_n8n, local_fallback
-from services.llm import call_llm, call_llm_stream
-from services.input_guard import check_input
-from services.output_guard import check_output
-from database import get_db, Widget, ChatSession, ChatLog, AbuseLog
+from app.models import ChatRequest, ChatResponse, RateLimitResponse
+from app.services.chat_proxy import proxy_to_n8n
+from app.services.input_guard import check_input
+from app.services.output_guard import check_output
+from app.database import get_db, Widget, ChatSession, ChatLog, AbuseLog
+
 
 router = APIRouter()
 
@@ -104,13 +104,6 @@ async def chat(slug: str, request: ChatRequest, db: Session = Depends(get_db)):
     await _log_message(db, widget, request.sessionId, "user", request.message)
 
     response = await proxy_to_n8n(slug, request.sessionId, request.message, db)
-
-    if response.startswith("Sorry, the AI assistant is temporarily unavailable"):
-        response = await call_llm(slug, request.message, request.sessionId, db)
-
-    if response in ("LLM API key is not configured.", "Sorry, I'm having trouble right now. Please try again later."):
-        response = local_fallback(slug, request.message, db)
-
     guard = await check_output(response)
     if not guard["safe"]:
         await _log_abuse(db, widget, request.sessionId, guard["reason"], response)
@@ -136,7 +129,7 @@ async def chat_stream(slug: str, request: ChatRequest, db: Session = Depends(get
         async def limit_gen():
             yield "data: " + json.dumps({"token": "You've reached the chat limit. Please try again later."}) + "\n\n"
             yield "data: " + json.dumps({"done": True}) + "\n\n"
-        return StreamingResponse(limit_gen(), media_type="text/event-stream")
+        return StreamingResponse(limit_gen(), media_type="text/event-stream", headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
 
     guard = await check_input(request.message)
     if not guard["clean"]:
@@ -144,27 +137,32 @@ async def chat_stream(slug: str, request: ChatRequest, db: Session = Depends(get
         async def blocked_gen():
             yield "data: " + json.dumps({"token": "I can't process that request. Please ask something about the portfolio."}) + "\n\n"
             yield "data: " + json.dumps({"done": True}) + "\n\n"
-        return StreamingResponse(blocked_gen(), media_type="text/event-stream")
+        return StreamingResponse(blocked_gen(), media_type="text/event-stream", headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
 
     await _log_message(db, widget, request.sessionId, "user", request.message)
 
+    response = await proxy_to_n8n(slug, request.sessionId, request.message, db)
+    guard = await check_output(response)
+    if not guard["safe"]:
+        response = guard["sanitized"]
+    elif guard["reason"] == "sanitized":
+        response = guard["sanitized"]
+
+    await _log_message(db, widget, request.sessionId, "assistant", response)
+
     async def stream_response():
-        full = ""
-        async for event in call_llm_stream(slug, request.message, request.sessionId, db):
-            yield event
-            parsed = json.loads(event[6:].strip())
-            if parsed.get("token"):
-                full += parsed["token"]
+        yield "data: " + json.dumps({"token": response}) + "\n\n"
+        yield "data: " + json.dumps({"done": True}) + "\n\n"
 
-        guard = await check_output(full)
-        if not guard["safe"]:
-            full = guard["sanitized"]
-        elif guard["reason"] == "sanitized":
-            full = guard["sanitized"]
-
-        await _log_message(db, widget, request.sessionId, "assistant", full)
-
-    return StreamingResponse(stream_response(), media_type="text/event-stream")
+    return StreamingResponse(
+        stream_response(),
+        media_type="text/event-stream",
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @router.get("/api/widget/{slug}/rate-limit", response_model=RateLimitResponse)
